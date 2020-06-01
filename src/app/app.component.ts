@@ -1,32 +1,103 @@
-import { Component } from '@angular/core';
+import {Component, OnInit} from '@angular/core';
+import {HttpClient} from '@angular/common/http';
+import {ITopology} from './models/ITopology';
+import {ITopologyPropertiesMap} from './models/ITopologyPropertiesMap';
 
 @Component({
   selector: 'm-root',
   template: `
-    <!--The content below is only a placeholder and can be replaced.-->
-    <div style="text-align:center" class="content">
-      <h1>
-        Welcome to {{title}}!
-      </h1>
-      <span style="display: block">{{ title }} app is running!</span>
-      <img width="300" alt="Angular Logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNTAgMjUwIj4KICAgIDxwYXRoIGZpbGw9IiNERDAwMzEiIGQ9Ik0xMjUgMzBMMzEuOSA2My4ybDE0LjIgMTIzLjFMMTI1IDIzMGw3OC45LTQzLjcgMTQuMi0xMjMuMXoiIC8+CiAgICA8cGF0aCBmaWxsPSIjQzMwMDJGIiBkPSJNMTI1IDMwdjIyLjItLjFWMjMwbDc4LjktNDMuNyAxNC4yLTEyMy4xTDEyNSAzMHoiIC8+CiAgICA8cGF0aCAgZmlsbD0iI0ZGRkZGRiIgZD0iTTEyNSA1Mi4xTDY2LjggMTgyLjZoMjEuN2wxMS43LTI5LjJoNDkuNGwxMS43IDI5LjJIMTgzTDEyNSA1Mi4xem0xNyA4My4zaC0zNGwxNy00MC45IDE3IDQwLjl6IiAvPgogIDwvc3ZnPg==">
-    </div>
-    <h2>Here are some links to help you start: </h2>
-    <ul>
-      <li>
-        <h2><a target="_blank" rel="noopener" href="https://angular.io/tutorial">Tour of Heroes</a></h2>
-      </li>
-      <li>
-        <h2><a target="_blank" rel="noopener" href="https://angular.io/cli">CLI Documentation</a></h2>
-      </li>
-      <li>
-        <h2><a target="_blank" rel="noopener" href="https://blog.angular.io/">Angular blog</a></h2>
-      </li>
-    </ul>
-    
+      <m-tree *ngIf="topology"
+              role="source"
+              [topology]="topology"
+              [topologyProperties]="topologyProperties"
+              (checkNode)="onCheckNode($event, 'sourceChecked')"
+              (expandNode)="onExpandNode($event, 'sourceExpanded')"></m-tree>
+
+      <div class="actions">
+          <button (click)="onAddClick()">add</button>
+          <button (click)="onRemoveClick()">remove</button>
+          <button (click)="onPrintSelected()">print right list to console</button>
+      </div>
+
+      <m-tree *ngIf="topology"
+              role="selected"
+              [topology]="topology"
+              [topologyProperties]="topologyProperties"
+              (checkNode)="onCheckNode($event, 'selectedChecked')"
+              (expandNode)="onExpandNode($event, 'selectedExpanded')"></m-tree>
   `,
-  styles: []
+  styles: [`
+      :host {
+          display: flex;
+          flex-direction: row;
+      }
+
+      m-tree {
+          flex: 1;
+      }
+  `]
 })
-export class AppComponent {
-  title = 'treeDemo';
+export class AppComponent implements OnInit {
+  public topology: ITopology = null;
+  public topologyProperties: ITopologyPropertiesMap = {};
+
+  constructor(private http: HttpClient) {
+  }
+
+  ngOnInit(): void {
+    this.http.get<ITopology>('/assets/data/minimalTopology.json').subscribe((result) => {
+      this.topology = result;
+    })
+  }
+
+  onAddClick() {
+    Object.keys(this.topologyProperties).forEach(key => {
+      if (this.topologyProperties[key].sourceChecked) {
+        this.topologyProperties[key].selected = true;
+        this.topologyProperties[key].sourceChecked = false;
+      }
+    });
+  }
+
+  onRemoveClick() {
+    Object.keys(this.topologyProperties).forEach(key => {
+      if (this.topologyProperties[key].selectedChecked) {
+        this.topologyProperties[key].selected = false;
+        this.topologyProperties[key].selectedChecked = false;
+      }
+    });
+  }
+
+  onCheckNode($event: any, field: string) {
+    const toggleSubTree = (tree) => {
+      const traverse = (node) => {
+        if (!this.topologyProperties.hasOwnProperty(node.id)) {
+          this.topologyProperties[node.id] = {}
+        }
+        this.topologyProperties[node.id][field] = $event.isChecked;
+        if (node.children && node.children.length) {
+          node.children.forEach(child => traverse(child));
+        }
+      };
+      traverse(tree);
+    };
+    toggleSubTree($event.item);
+  }
+
+  onExpandNode($event: any, field: string) {
+    if (!this.topologyProperties.hasOwnProperty($event.id)) {
+      this.topologyProperties[$event.id] = {}
+    }
+    this.topologyProperties[$event.id][field] = $event.isExpanded;
+  }
+
+  onPrintSelected() {
+    const selected = [];
+    Object.keys(this.topologyProperties).forEach(key => {
+      if (this.topologyProperties[key].selected) {
+        selected.push(key);
+      }
+    });
+    console.log(selected);
+  }
 }
